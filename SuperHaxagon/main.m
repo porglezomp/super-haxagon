@@ -65,46 +65,52 @@ int main(int argc, const char * argv[])
 {
 
     @autoreleasepool {
-//        [NSThread sleepForTimeInterval:5.0f];
-        CGImageRef image = CGDisplayCreateImage(CGMainDisplayID());
-        NSData *data = (NSData *)CFBridgingRelease(CGDataProviderCopyData(CGImageGetDataProvider(image)));
-        
-        bytes = [data bytes];
-        
-        int width = (int) CGImageGetWidth(image);
-        int height = (int) CGImageGetHeight(image);
-        bpr = (int) CGImageGetBytesPerRow(image);
-        size_t bpp = CGImageGetBitsPerPixel(image);
-        size_t bpc = CGImageGetBitsPerComponent(image);
-        bytes_per_pixel = (int) bpp / bpc;
-        
-        int downsample_by = 10;
-        int w = width/downsample_by; int h = height/downsample_by;
-        
-        UInt8 pixelData[w * h * 3];
-        
-        // fill the raw pixel buffer with arbitrary gray color for test
-        int dx = width/w;
-        int dy = height/h;
-        
-        int i = 0;
-        int r = 0; int g = 0; int b = 0;
-        for (int y = 0; y < h; y++) {
-            for(int x = 0; x < w; x++) {
-                int dest = (y*w + x)*3;
-                color c = getColorAtPoint(x*dx, y*dy);
-                pixelData[dest+0] = c.r;
-                pixelData[dest+1] = c.g;
-                pixelData[dest+2] = c.b;
-                i++;
+        int timesteps = 300;
+        uint8_t pixelData[timesteps*3];
+        for (int t = 0; t < timesteps; t++) {
+            [NSThread sleepForTimeInterval:0.2];
+            CGImageRef image = CGDisplayCreateImage(CGMainDisplayID());
+            NSData *data = (NSData *)CFBridgingRelease(CGDataProviderCopyData(CGImageGetDataProvider(image)));
+            
+            bytes = [data bytes];
+            
+            int width = (int) CGImageGetWidth(image);
+            int height = (int) CGImageGetHeight(image);
+            bpr = (int) CGImageGetBytesPerRow(image);
+            size_t bpp = CGImageGetBitsPerPixel(image);
+            size_t bpc = CGImageGetBitsPerComponent(image);
+            bytes_per_pixel = (int) bpp / bpc;
+            
+            int downsample_by = 10;
+            int w = width/downsample_by; int h = height/downsample_by;
+            
+            // fill the raw pixel buffer with arbitrary gray color for test
+            int dx = width/w;
+            int dy = height/h;
+            
+            int i = 0;
+            int r = 0; int g = 0; int b = 0;
+            for (int y = 0; y < h; y++) {
+                for(int x = 0; x < w; x++) {
+                    color c = getColorAtPoint(x*dx, y*dy);
+                    r += c.r;
+                    g += c.g;
+                    b += c.b;
+                    i++;
+                }
             }
+            NSLog(@"%i", i);
+            r /= i;
+            g /= i;
+            b /= i;
+            
+            pixelData[t*3+0] = r;
+            pixelData[t*3+1] = g;
+            pixelData[t*3+2] = b;
+        
+            CGImageRelease(image);
         }
-        NSLog(@"%i", i);
-        
-        savePixelsToFile(pixelData, @"/Users/caleb/Desktop/stuff.png", w, h);
-    
-        CGImageRelease(image);
-        
+        savePixelsToFile(pixelData, @"/Users/caleb/Desktop/stuff.png", timesteps, 1);
     }
     return 0;
 }

@@ -54,6 +54,7 @@ int bpr, bytes_per_pixel;
 
 color getColorAtPoint(int x, int y) {
     color c;
+    if (x < 0 || y < 0 ) return c;
     int point = (y*bpr + x*bytes_per_pixel);
     c.b = bytes[point+0];
     c.g = bytes[point+1];
@@ -61,9 +62,15 @@ color getColorAtPoint(int x, int y) {
     return c;
 }
 
+BOOL colorEqual(color a, color b) {
+    return a.r == b.r && a.g == b.g && a.b == b.b;
+}
+
 #define SPACE_KEY_CODE  49
 #define LEFT_KEY_CODE   123
 #define RIGHT_KEY_CODE  124
+
+#define DEG2RAD M_PI/180
 
 int main(int argc, const char * argv[])
 {
@@ -79,13 +86,15 @@ int main(int argc, const char * argv[])
         CGEventRef ru = CGEventCreateKeyboardEvent(NULL, RIGHT_KEY_CODE, NO);
         
         CGEventPost(kCGAnnotatedSessionEventTap, sd);
-        [NSThread sleepForTimeInterval:0.1 ];
+        [NSThread sleepForTimeInterval:0.1];
         CGEventPost(kCGAnnotatedSessionEventTap, su);
         
-        int timesteps = 50;
-        uint8_t pixelData[timesteps*3];
+        int timesteps = 100;
+        int downsample_by = 3;
+        int angles = 100;
+        uint8_t pixelData[angles*timesteps*3];
         for (int t = 0; t < timesteps; t++) {
-            [NSThread sleepForTimeInterval:0.2];
+            [NSThread sleepForTimeInterval:0.1];
             CGImageRef image = CGDisplayCreateImage(CGMainDisplayID());
             NSData *data = (NSData *)CFBridgingRelease(CGDataProviderCopyData(CGImageGetDataProvider(image)));
             
@@ -98,44 +107,62 @@ int main(int argc, const char * argv[])
             size_t bpc = CGImageGetBitsPerComponent(image);
             bytes_per_pixel = (int) bpp / bpc;
             
-            int downsample_by = 10;
-            int w = width/downsample_by; int h = height/downsample_by;
+//            int w = width/downsample_by;
+//            int h = height/downsample_by;
             
-            // fill the raw pixel buffer with arbitrary gray color for test
-            int dx = width/w;
-            int dy = height/h;
+            int da = 360/angles;
             
-            int i = 0;
-            int r = 0; int g = 0; int b = 0;
-            for (int y = 0; y < h; y++) {
-                for(int x = 0; x < w; x++) {
-                    color c = getColorAtPoint(x*dx, y*dy);
-                    r += c.r;
-                    g += c.g;
-                    b += c.b;
-                    i++;
+            for (int a = 0; a < angles; a++) {
+                int pixel = (t*angles + a)*3;
+                pixelData[pixel+0] = 0;
+                pixelData[pixel+1] = 0;
+                pixelData[pixel+2] = 0;
+                
+                float rangle = a*da*DEG2RAD;
+                float rangle2 = (a-1)*da*DEG2RAD;
+                int x1 = cos(rangle)*100;
+                int y1 = sin(rangle)*100;
+                int x1b = cos(rangle2)*100;
+                int y1b = sin(rangle2)*100;
+                if (colorEqual(getColorAtPoint(x1+width/2, y1+height/2),
+                               getColorAtPoint(x1b+width/2, y1b+height/2))) {
+                    continue;
                 }
-            }
-            NSLog(@"%i", i);
-            r /= i;
-            g /= i;
-            b /= i;
-            
-            pixelData[t*3+0] = r;
-            pixelData[t*3+1] = g;
-            pixelData[t*3+2] = b;
-            
-            if (t % 6 < 3) {
-                CGEventPost(kCGAnnotatedSessionEventTap, lu);
-                CGEventPost(kCGAnnotatedSessionEventTap, rd);
-            } else {
-                CGEventPost(kCGAnnotatedSessionEventTap, ru);
-                CGEventPost(kCGAnnotatedSessionEventTap, ld);
+                
+                int x2 = x1*2; int y2 = y1*2;
+                x2 += width/2; y2 += height/2;
+                int x2b = x1b*2; int y2b = y1b*2;
+                x2b += width/2; y2b += height/2;
+                if (colorEqual(getColorAtPoint(x2, y2),
+                               getColorAtPoint(x2b, y2b))) {
+                    pixelData[pixel+0] = 255;
+                    continue;
+                }
+                
+                int x3 = x1*3; int y3 = y1*3;
+                x3 += width/2; y3 += height/2;
+                int x3b = x1b*3; int y3b = y1b*3;
+                x3b += width/2; y3b += height/2;
+                if (colorEqual(getColorAtPoint(x3, y3),
+                               getColorAtPoint(x3b, y3b))) {
+                    pixelData[pixel+1] = 255;
+                    continue;
+                }
+                
+                pixelData[pixel+0] = 255;
+                pixelData[pixel+1] = 255;
+                pixelData[pixel+2] = 255;
             }
         
             CGImageRelease(image);
         }
-        savePixelsToFile(pixelData, [NSHomeDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"Desktop/Haxagon/gradient.png"]], timesteps, 1);
+        
+        NSString *path = [NSHomeDirectory() stringByAppendingPathComponent:
+                         [NSString stringWithFormat:@"Desktop/Haxagon/gradient.png"]];
+        savePixelsToFile(pixelData, path, angles, timesteps);
+        
+        CGEventPost(kCGAnnotatedSessionEventTap, ru);
+        CGEventPost(kCGAnnotatedSessionEventTap, lu);
         CFRelease(su);
         CFRelease(sd);
         CFRelease(ld);

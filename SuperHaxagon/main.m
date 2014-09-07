@@ -65,7 +65,7 @@ int main(int argc, const char * argv[])
 {
 
     @autoreleasepool {
-        int timesteps = 300;
+        int timesteps = 50;
         uint8_t pixelData[timesteps*3];
         for (int t = 0; t < timesteps; t++) {
             [NSThread sleepForTimeInterval:0.2];
@@ -110,7 +110,7 @@ int main(int argc, const char * argv[])
         
             CGImageRelease(image);
         }
-        savePixelsToFile(pixelData, @"/Users/caleb/Desktop/stuff.png", timesteps, 1);
+        savePixelsToFile(pixelData, [NSHomeDirectory() stringByAppendingPathComponent:@"Desktop/stuff.png"], timesteps, 1);
     }
     return 0;
 }

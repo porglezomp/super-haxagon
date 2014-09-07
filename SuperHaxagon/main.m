@@ -61,10 +61,27 @@ color getColorAtPoint(int x, int y) {
     return c;
 }
 
+#define SPACE_KEY_CODE  49
+#define LEFT_KEY_CODE   123
+#define RIGHT_KEY_CODE  124
+
 int main(int argc, const char * argv[])
 {
 
     @autoreleasepool {
+        [NSThread sleepForTimeInterval:5.0];
+        
+        CGEventRef sd = CGEventCreateKeyboardEvent(NULL, SPACE_KEY_CODE, YES);
+        CGEventRef su = CGEventCreateKeyboardEvent(NULL, SPACE_KEY_CODE, NO);
+        CGEventRef ld = CGEventCreateKeyboardEvent(NULL, LEFT_KEY_CODE, YES);
+        CGEventRef lu = CGEventCreateKeyboardEvent(NULL, LEFT_KEY_CODE, NO);
+        CGEventRef rd = CGEventCreateKeyboardEvent(NULL, RIGHT_KEY_CODE, YES);
+        CGEventRef ru = CGEventCreateKeyboardEvent(NULL, RIGHT_KEY_CODE, NO);
+        
+        CGEventPost(kCGAnnotatedSessionEventTap, sd);
+        [NSThread sleepForTimeInterval:0.1 ];
+        CGEventPost(kCGAnnotatedSessionEventTap, su);
+        
         int timesteps = 50;
         uint8_t pixelData[timesteps*3];
         for (int t = 0; t < timesteps; t++) {
@@ -107,10 +124,24 @@ int main(int argc, const char * argv[])
             pixelData[t*3+0] = r;
             pixelData[t*3+1] = g;
             pixelData[t*3+2] = b;
+            
+            if (t % 6 < 3) {
+                CGEventPost(kCGAnnotatedSessionEventTap, lu);
+                CGEventPost(kCGAnnotatedSessionEventTap, rd);
+            } else {
+                CGEventPost(kCGAnnotatedSessionEventTap, ru);
+                CGEventPost(kCGAnnotatedSessionEventTap, ld);
+            }
         
             CGImageRelease(image);
         }
-        savePixelsToFile(pixelData, [NSHomeDirectory() stringByAppendingPathComponent:@"Desktop/stuff.png"], timesteps, 1);
+        savePixelsToFile(pixelData, [NSHomeDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"Desktop/Haxagon/gradient.png"]], timesteps, 1);
+        CFRelease(su);
+        CFRelease(sd);
+        CFRelease(ld);
+        CFRelease(lu);
+        CFRelease(rd);
+        CFRelease(ru);
     }
     return 0;
 }

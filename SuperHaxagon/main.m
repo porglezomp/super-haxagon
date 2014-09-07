@@ -28,29 +28,58 @@ BOOL CGImageWriteToFile(CGImageRef image, NSString *path) {
     return YES;
 }
 
+void savePixelsToFile(uint8 pixels[], NSString *filename, int width, int height) {
+    CGColorSpaceRef colorspace = CGColorSpaceCreateDeviceRGB();
+    CFDataRef rgbData = CFDataCreate(NULL, pixels, width * height * 3);
+    CGDataProviderRef provider = CGDataProviderCreateWithCFData(rgbData);
+    CGImageRef rgbImageRef = CGImageCreate(width, height, 8, 24, width * 3, colorspace, kCGBitmapByteOrderDefault, provider, NULL, true, kCGRenderingIntentDefault);
+    CFRelease(rgbData);
+    CGDataProviderRelease(provider);
+    CGColorSpaceRelease(colorspace);
+    
+    CGImageWriteToFile(rgbImageRef, filename);
+    
+    CGImageRelease(rgbImageRef);
+}
+
+struct color {
+    uint8 r;
+    uint8 g;
+    uint8 b;
+}; typedef struct color color;
+
+const uint8_t *bytes;
+int bpr, bytes_per_pixel;
+
+
+color getColorAtPoint(int x, int y) {
+    color c;
+    int point = (y*bpr + x*bytes_per_pixel);
+    c.b = bytes[point+0];
+    c.g = bytes[point+1];
+    c.r = bytes[point+2];
+    return c;
+}
+
 int main(int argc, const char * argv[])
 {
 
     @autoreleasepool {
-        [NSThread sleepForTimeInterval:5.0f];
+//        [NSThread sleepForTimeInterval:5.0f];
         CGImageRef image = CGDisplayCreateImage(CGMainDisplayID());
         NSData *data = (NSData *)CFBridgingRelease(CGDataProviderCopyData(CGImageGetDataProvider(image)));
         
-        const uint8_t *bytes = [data bytes];
+        bytes = [data bytes];
         
-        size_t width = CGImageGetWidth(image);
-        size_t height = CGImageGetHeight(image);
-        size_t bpr = CGImageGetBytesPerRow(image);
+        int width = (int) CGImageGetWidth(image);
+        int height = (int) CGImageGetHeight(image);
+        bpr = (int) CGImageGetBytesPerRow(image);
         size_t bpp = CGImageGetBitsPerPixel(image);
         size_t bpc = CGImageGetBitsPerComponent(image);
-        size_t bytes_per_pixel = bpp / bpc;
-        size_t pixels_per_row = bpr / bpp;
-    
-        NSUInteger len = [data length];
+        bytes_per_pixel = (int) bpp / bpc;
         
-//        68*38
-        
-        int w = width/5; int h = height/5;
+        int downsample_by = 10;
+        int w = width/downsample_by; int h = height/downsample_by;
         
         UInt8 pixelData[w * h * 3];
         
@@ -58,36 +87,22 @@ int main(int argc, const char * argv[])
         int dx = width/w;
         int dy = height/h;
         
+        int i = 0;
+        int r = 0; int g = 0; int b = 0;
         for (int y = 0; y < h; y++) {
             for(int x = 0; x < w; x++) {
                 int dest = (y*w + x)*3;
-                int src = (y*bpr*5 + x*bytes_per_pixel*5);
-                pixelData[dest+0] = bytes[src+2];
-                pixelData[dest+1] = bytes[src+1];
-                pixelData[dest+2] = bytes[src+0];
+                color c = getColorAtPoint(x*dx, y*dy);
+                pixelData[dest+0] = c.r;
+                pixelData[dest+1] = c.g;
+                pixelData[dest+2] = c.b;
+                i++;
             }
         }
+        NSLog(@"%i", i);
         
-        CGColorSpaceRef colorspace = CGColorSpaceCreateDeviceRGB();
-        
-        CFDataRef rgbData = CFDataCreate(NULL, pixelData, w * h * 3);
-        
-        CGDataProviderRef provider = CGDataProviderCreateWithCFData(rgbData);
-        
-        CGImageRef rgbImageRef = CGImageCreate(w, h, 8, 24, w * 3, colorspace, kCGBitmapByteOrderDefault, provider, NULL, true, kCGRenderingIntentDefault);
-        
-        CFRelease(rgbData);
-        
-        CGDataProviderRelease(provider);
-        
-        CGColorSpaceRelease(colorspace);
-        
-        CGImageWriteToFile(rgbImageRef, @"/Users/caleb/Desktop/stuff.png");
-        
-        CGImageRelease(rgbImageRef);
-        
-        NSLog(@"%li %li", width, height);
-        
+        savePixelsToFile(pixelData, @"/Users/caleb/Desktop/stuff.png", w, h);
+    
         CGImageRelease(image);
         
     }

@@ -72,6 +72,20 @@ BOOL colorEqual(color a, color b) {
 
 #define DEG2RAD M_PI/180
 
+const int downsample_by = 3;
+const int tw = 1366/downsample_by;
+const int th = 768/downsample_by;
+uint8_t pixelData[tw*th*3];
+
+BOOL setPixel(int x, int y, color c) {
+    if (x < 0 || y < 0 || x >= tw || y >= th) return NO;
+    int pixel = (tw*y + x)*3;
+    pixelData[pixel+0] = c.r;
+    pixelData[pixel+1] = c.g;
+    pixelData[pixel+2] = c.b;
+    return YES;
+}
+
 int main(int argc, const char * argv[])
 {
 
@@ -90,9 +104,7 @@ int main(int argc, const char * argv[])
         CGEventPost(kCGAnnotatedSessionEventTap, su);
         
         int timesteps = 100;
-        int downsample_by = 3;
         int angles = 100;
-        uint8_t pixelData[angles*timesteps*3];
         for (int t = 0; t < timesteps; t++) {
             [NSThread sleepForTimeInterval:0.1];
             CGImageRef image = CGDisplayCreateImage(CGMainDisplayID());
@@ -107,10 +119,12 @@ int main(int argc, const char * argv[])
             size_t bpc = CGImageGetBitsPerComponent(image);
             bytes_per_pixel = (int) bpp / bpc;
             
-//            int w = width/downsample_by;
-//            int h = height/downsample_by;
+            int w = width/downsample_by;
+            int h = height/downsample_by;
             
             int da = 360/angles;
+            
+            float base_angle = 0.0;
             
             for (int a = 0; a < angles; a++) {
                 int pixel = (t*angles + a)*3;
@@ -135,31 +149,52 @@ int main(int argc, const char * argv[])
                 x2b += width/2; y2b += height/2;
                 if (colorEqual(getColorAtPoint(x2, y2),
                                getColorAtPoint(x2b, y2b))) {
-                    pixelData[pixel+0] = 255;
+//                    pixelData[pixel+0] = 255;
                     continue;
                 }
                 
-                int x3 = x1*3; int y3 = y1*3;
-                x3 += width/2; y3 += height/2;
-                int x3b = x1b*3; int y3b = y1b*3;
-                x3b += width/2; y3b += height/2;
-                if (colorEqual(getColorAtPoint(x3, y3),
-                               getColorAtPoint(x3b, y3b))) {
-                    pixelData[pixel+1] = 255;
-                    continue;
-                }
-                
-                pixelData[pixel+0] = 255;
-                pixelData[pixel+1] = 255;
-                pixelData[pixel+2] = 255;
+//                int x3 = x1*3; int y3 = y1*3;
+//                x3 += width/2; y3 += height/2;
+//                int x3b = x1b*3; int y3b = y1b*3;
+//                x3b += width/2; y3b += height/2;
+//                if (colorEqual(getColorAtPoint(x3, y3),
+//                               getColorAtPoint(x3b, y3b))) {
+//                    pixelData[pixel+1] = 255;
+//                    continue;
+//                }
+                base_angle = a*da;
+                break;
             }
-        
+            
+            for (int y = 0; y < h; y++) {
+                for (int x = 0; x < w; x++) {
+                    int pixel = (y*w + x)*3;
+                    color c = getColorAtPoint(x*downsample_by, y*downsample_by);
+                    
+                    pixelData[pixel+0] = c.r;
+                    pixelData[pixel+1] = c.g;
+                    pixelData[pixel+2] = c.b;
+                }
+            }
+            
+            for (int i = 0; i < 12; i++) {
+                float angle = (base_angle + 30*i)*DEG2RAD;
+                float dx = cos(angle)*5;
+                float dy = sin(angle)*5;
+                float x = w/2;
+                float y = h/2;
+                color c; if (i%2 == 0) { c.b = 255; c.g = 255; } else { c.b = 0; c.g = 255; }
+                while (setPixel((int)x, (int)y, c)) {
+                    x += dx; y += dy;
+                }
+            }
+            
+            NSString *path = [NSHomeDirectory() stringByAppendingPathComponent:
+                              [NSString stringWithFormat:@"Desktop/Haxagon/%02i.png", t]];
+            savePixelsToFile(pixelData, path, w, h);
+            
             CGImageRelease(image);
         }
-        
-        NSString *path = [NSHomeDirectory() stringByAppendingPathComponent:
-                         [NSString stringWithFormat:@"Desktop/Haxagon/gradient.png"]];
-        savePixelsToFile(pixelData, path, angles, timesteps);
         
         CGEventPost(kCGAnnotatedSessionEventTap, ru);
         CGEventPost(kCGAnnotatedSessionEventTap, lu);
